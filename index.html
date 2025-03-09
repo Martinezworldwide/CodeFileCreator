@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Code File Creator</title>
+    <style>
+        body {
+            font-family: 'Arial', sans-serif;
+            background-color: #0d0d0d;
+            color: #ffffff;
+            text-align: center;
+            padding: 20px;
+        }
+        .container {
+            max-width: 850px;
+            margin: auto;
+            padding: 65px;
+            background: linear-gradient(135deg, #1a1a1a, #333333);
+            border-radius: 10px;
+            box-shadow: 0px 0px 10px rgba(255, 0, 0, 0.8);
+        }
+        select, textarea, button {
+            margin: 10px;
+            padding: 10px;
+            font-size: 16px;
+            border-radius: 5px;
+            border: none;
+        }
+        select {
+            width: 100%;
+            background-color: #222;
+            color: #ff0000;
+        }
+        textarea {
+            width: 100%;
+            height: 300px;
+            background-color: #252526;
+            color: #ffffff;
+            border: none;
+            resize: vertical;
+            padding: 10px;
+        }
+        button {
+            background-color: #ff0000;
+            color: #ffffff;
+            cursor: pointer;
+            font-weight: bold;
+        }
+        button:hover {
+            background-color: #cc0000;
+        }
+        .dropdown-container {
+            text-align: left;
+        }
+        .dropdown {
+            margin-top: 10px;
+        }
+        .dropdown label {
+            font-weight: bold;
+            color: #ff0000;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Code File Creator</h1>
+        <div class="dropdown-container">
+            <label for="category">Select Category:</label>
+            <select id="category" onchange="updateFileTypes()">
+                <option value="web">Web Development</option>
+                <option value="programming">General Programming</option>
+                <option value="scripting">Scripting</option>
+                <option value="database">Database</option>
+            </select>
+        </div>
+        <div class="dropdown">
+            <label for="fileType">Choose File Type:</label>
+            <select id="fileType">
+                <!-- Options will be populated dynamically -->
+            </select>
+        </div>
+        <textarea id="codeEditor" placeholder="Write your code here..."></textarea>
+        <br>
+        <button onclick="downloadFile()">Download File</button>
+    </div>
+    <script>
+        const fileOptions = {
+            web: [
+                { text: "HTML (.html)", value: ".html" },
+                { text: "CSS (.css)", value: ".css" },
+                { text: "JavaScript (.js)", value: ".js" }
+            ],
+            programming: [
+                { text: "Python (.py)", value: ".py" },
+                { text: "Java (.java)", value: ".java" },
+                { text: "C (.c)", value: ".c" },
+                { text: "C++ (.cpp)", value: ".cpp" }
+            ],
+            scripting: [
+                { text: "Shell Script (.sh)", value: ".sh" },
+                { text: "Batch Script (.bat)", value: ".bat" }
+            ],
+            database: [
+                { text: "SQL (.sql)", value: ".sql" }
+            ]
+        };
+
+        function updateFileTypes() {
+            const category = document.getElementById("category").value;
+            const fileTypeSelect = document.getElementById("fileType");
+            fileTypeSelect.innerHTML = "";
+            fileOptions[category].forEach(option => {
+                let newOption = document.createElement("option");
+                newOption.text = option.text;
+                newOption.value = option.value;
+                fileTypeSelect.appendChild(newOption);
+            });
+        }
+
+        function downloadFile() {
+            let fileType = document.getElementById("fileType").value;
+            let codeContent = document.getElementById("codeEditor").value;
+            let fileName = "newfile" + fileType;
+            let blob = new Blob([codeContent], { type: "text/plain" });
+            let link = document.createElement("a");
+            link.href = URL.createObjectURL(blob);
+            link.download = fileName;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+
+        window.onload = updateFileTypes;
+    </script>
+</body>
+</html>

@@ -86,6 +86,7 @@
         <button onclick="downloadFile()">Download File</button>
     </div>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script>
         const fileOptions = {
             web: [
@@ -109,7 +110,8 @@
             documents: [
                 { text: "Text File (.txt)", value: ".txt" },
                 { text: "Word Document (.docx)", value: ".docx" },
-                { text: "Rich Text Format (.rtf)", value: ".rtf" }
+                { text: "Rich Text Format (.rtf)", value: ".rtf" },
+                { text: "PDF Document (.pdf)", value: ".pdf" }
             ]
         };
 
@@ -147,6 +149,50 @@
                 .replace(/>/g, "&gt;")
                 .replace(/"/g, "&quot;")
                 .replace(/'/g, "&apos;");
+        }
+
+        // Function to create PDF file using jsPDF
+        function createPDF(content) {
+            // Check if jsPDF is loaded
+            if (typeof window.jspdf === 'undefined') {
+                throw new Error("jsPDF library not loaded. Please check your internet connection.");
+            }
+
+            const { jsPDF } = window.jspdf;
+            const doc = new jsPDF();
+            
+            // Split content into lines
+            const lines = content.split('\n');
+            const pageWidth = doc.internal.pageSize.getWidth();
+            const pageHeight = doc.internal.pageSize.getHeight();
+            const margin = 20;
+            const lineHeight = 7;
+            let yPosition = margin;
+            const maxWidth = pageWidth - (margin * 2);
+
+            // Process each line
+            lines.forEach((line, index) => {
+                // Check if we need a new page
+                if (yPosition + lineHeight > pageHeight - margin) {
+                    doc.addPage();
+                    yPosition = margin;
+                }
+
+                // Split long lines that exceed page width
+                const splitLines = doc.splitTextToSize(line || ' ', maxWidth);
+                splitLines.forEach((splitLine) => {
+                    if (yPosition + lineHeight > pageHeight - margin) {
+                        doc.addPage();
+                        yPosition = margin;
+                    }
+                    doc.text(splitLine, margin, yPosition);
+                    yPosition += lineHeight;
+                });
+            });
+
+            // Generate blob from PDF
+            const pdfBlob = doc.output('blob');
+            return pdfBlob;
         }
 
         // Function to create DOCX file using JSZip (DOCX is a ZIP archive)
@@ -237,6 +283,15 @@
                     mimeType = "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
                 } catch (error) {
                     alert("Error creating DOCX file: " + error.message);
+                    return;
+                }
+            } else if (fileType === ".pdf") {
+                // PDF document - created using jsPDF
+                try {
+                    blob = createPDF(codeContent);
+                    mimeType = "application/pdf";
+                } catch (error) {
+                    alert("Error creating PDF file: " + error.message);
                     return;
                 }
             } else {

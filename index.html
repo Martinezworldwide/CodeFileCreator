@@ -72,6 +72,7 @@
                 <option value="programming">General Programming</option>
                 <option value="scripting">Scripting</option>
                 <option value="database">Database</option>
+                <option value="documents">Documents</option>
             </select>
         </div>
         <div class="dropdown">
@@ -84,6 +85,7 @@
         <br>
         <button onclick="downloadFile()">Download File</button>
     </div>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
     <script>
         const fileOptions = {
             web: [
@@ -103,6 +105,11 @@
             ],
             database: [
                 { text: "SQL (.sql)", value: ".sql" }
+            ],
+            documents: [
+                { text: "Text File (.txt)", value: ".txt" },
+                { text: "Word Document (.docx)", value: ".docx" },
+                { text: "Rich Text Format (.rtf)", value: ".rtf" }
             ]
         };
 
@@ -118,17 +125,134 @@
             });
         }
 
-        function downloadFile() {
+        // Function to create RTF content from plain text
+        function createRTFContent(text) {
+            // RTF header with basic formatting
+            const rtfHeader = "{\\rtf1\\ansi\\deff0 {\\fonttbl {\\f0 Times New Roman;}}\\f0\\fs24 ";
+            // Escape special RTF characters
+            const escapedText = text
+                .replace(/\\/g, "\\\\")  // Escape backslashes
+                .replace(/{/g, "\\{")    // Escape opening braces
+                .replace(/}/g, "\\}")    // Escape closing braces
+                .replace(/\n/g, "\\par "); // Convert newlines to paragraph breaks
+            const rtfFooter = "}";
+            return rtfHeader + escapedText + rtfFooter;
+        }
+
+        // Function to escape XML special characters
+        function escapeXML(text) {
+            return text
+                .replace(/&/g, "&amp;")
+                .replace(/</g, "&lt;")
+                .replace(/>/g, "&gt;")
+                .replace(/"/g, "&quot;")
+                .replace(/'/g, "&apos;");
+        }
+
+        // Function to create DOCX file using JSZip (DOCX is a ZIP archive)
+        async function createDOCX(content) {
+            // Check if JSZip is loaded
+            if (typeof JSZip === 'undefined') {
+                throw new Error("JSZip library not loaded. Please check your internet connection.");
+            }
+
+            const zip = new JSZip();
+            
+            // Split content into paragraphs and create XML content
+            const paragraphs = content.split('\n').map(line => {
+                const escapedLine = escapeXML(line || '');
+                return `<w:p><w:r><w:t>${escapedLine}</w:t></w:r></w:p>`;
+            }).join('');
+
+            // Create the main document XML
+            const documentXML = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+    <w:body>
+        ${paragraphs}
+    </w:body>
+</w:document>`;
+
+            // Create relationships XML
+            const relsXML = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+    <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/>
+</Relationships>`;
+
+            // Create document relationships XML
+            const wordRelsXML = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+    <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>
+</Relationships>`;
+
+            // Create styles XML
+            const stylesXML = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:styles xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+    <w:style w:type="paragraph" w:default="1" w:styleId="Normal">
+        <w:name w:val="Normal"/>
+    </w:style>
+</w:styles>`;
+
+            // Create content types XML
+            const contentTypeXML = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
+    <Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
+    <Default Extension="xml" ContentType="application/xml"/>
+    <Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>
+    <Override PartName="/word/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml"/>
+</Types>`;
+
+            // Add files to ZIP
+            zip.file("[Content_Types].xml", contentTypeXML);
+            zip.folder("_rels").file(".rels", relsXML);
+            zip.folder("word").file("document.xml", documentXML);
+            zip.folder("word").folder("_rels").file("document.xml.rels", wordRelsXML);
+            zip.folder("word").file("styles.xml", stylesXML);
+
+            // Generate blob
+            const blob = await zip.generateAsync({ type: "blob", mimeType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document" });
+            return blob;
+        }
+
+        async function downloadFile() {
             let fileType = document.getElementById("fileType").value;
             let codeContent = document.getElementById("codeEditor").value;
             let fileName = "newfile" + fileType;
-            let blob = new Blob([codeContent], { type: "text/plain" });
+            let blob;
+            let mimeType;
+
+            // Handle different file types
+            if (fileType === ".txt") {
+                // Plain text file
+                blob = new Blob([codeContent], { type: "text/plain;charset=utf-8" });
+                mimeType = "text/plain";
+            } else if (fileType === ".rtf") {
+                // Rich Text Format file
+                const rtfContent = createRTFContent(codeContent);
+                blob = new Blob([rtfContent], { type: "application/rtf" });
+                mimeType = "application/rtf";
+            } else if (fileType === ".docx") {
+                // Word document - created using JSZip
+                try {
+                    blob = await createDOCX(codeContent);
+                    mimeType = "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+                } catch (error) {
+                    alert("Error creating DOCX file: " + error.message);
+                    return;
+                }
+            } else {
+                // Default: plain text for code files
+                blob = new Blob([codeContent], { type: "text/plain" });
+                mimeType = "text/plain";
+            }
+
+            // Create download link and trigger download
             let link = document.createElement("a");
             link.href = URL.createObjectURL(blob);
             link.download = fileName;
             document.body.appendChild(link);
             link.click();
             document.body.removeChild(link);
+            URL.revokeObjectURL(link.href); // Clean up the object URL
         }
 
         window.onload = updateFileTypes;
